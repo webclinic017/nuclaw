@@ -1,0 +1,41 @@
+# Rust
+target/
+Cargo.lock
+
+# Build artifacts
+*.o
+*.so
+*.a
+*.rlib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data
+data/
+store/
+groups/*/!.gitkeep
+groups/global/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Credentials
+store/auth/
+*.pem
+*.key
+
+# Temp files
+*.tmp
+*.bak

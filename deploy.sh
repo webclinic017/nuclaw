@@ -174,30 +174,46 @@ setup_project() {
     log_step "设置项目..."
 
     # 确定项目目录
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -n "${BASH_SOURCE[0]}" ]]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        # 通过 curl | bash 执行时，BASH_SOURCE[0] 为空
+        SCRIPT_DIR="$(pwd)"
+        log_info "通过管道执行，使用当前目录"
+    fi
     PROJECT_DIR="$SCRIPT_DIR"
 
-    if [[ "$SCRIPT_DIR" == "$(pwd)" ]]; then
-        # 当前目录就是项目目录
+    # 检查是否需要克隆项目
+    if [[ ! -d ".git" ]]; then
+        log_info "未检测到 Git 仓库，将克隆项目..."
+
+        # 创建临时目录
+        TEMP_DIR=$(mktemp -d)
+        cd "$TEMP_DIR"
+
+        # 克隆项目
+        log_info "克隆 NuClaw 仓库..."
+        if git clone https://github.com/gyc567/nuclaw.git; then
+            cd nuclaw
+            PROJECT_DIR="$(pwd)"
+            log_info "项目已克隆到: $PROJECT_DIR"
+        else
+            log_error "克隆项目失败"
+            rm -rf "$TEMP_DIR"
+            return 1
+        fi
+    else
+        # 更新现有项目
+        cd "$PROJECT_DIR"
         if [[ -d ".git" ]]; then
             log_info "更新现有项目..."
             git pull origin main 2>/dev/null || log_warn "Git 更新失败"
-        else
-            log_info "克隆项目..."
-            if command -v git &> /dev/null; then
-                read -p "请输入项目目录路径 (默认当前目录): " INPUT_DIR
-                if [[ -n "$INPUT_DIR" ]]; then
-                    cd "$INPUT_DIR"
-                fi
-                log_info "请手动执行: git clone https://github.com/gyc567/nuclaw.git"
-            else
-                log_error "Git 未安装，无法克隆项目"
-            fi
         fi
-    else
-        cd "$PROJECT_DIR"
-        log_info "工作目录: $PROJECT_DIR"
     fi
+
+    # 导出 PROJECT_DIR 供其他函数使用
+    export PROJECT_DIR
+    cd "$PROJECT_DIR"
 
     # 检查项目文件
     if [[ -f "Cargo.toml" ]]; then
@@ -212,6 +228,7 @@ setup_project() {
 setup_directories() {
     log_step "创建运行时目录..."
 
+    # 确保在项目目录中
     cd "$PROJECT_DIR"
 
     # 创建运行时目录

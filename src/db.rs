@@ -205,8 +205,15 @@ mod tests {
             connection_timeout_ms: 5000,
         };
 
-        let db = Database::with_config(config);
-        assert!(db.is_ok(), "Database should be created successfully");
+        let result = Database::with_config(config);
+        assert!(
+            result.is_ok(),
+            "Database should be created successfully: {:?}",
+            result.err()
+        );
+
+        // Explicit cleanup
+        drop(result);
         cleanup_test_db(&db_path);
     }
 
@@ -282,15 +289,26 @@ mod tests {
 
     #[test]
     fn test_database_config_defaults() {
+        std::env::remove_var("DB_POOL_SIZE");
+        std::env::remove_var("DB_CONNECTION_TIMEOUT_MS");
+
         let config = DatabaseConfig::default();
         assert_eq!(config.pool_size, 10);
         assert_eq!(config.connection_timeout_ms, 30000);
+
+        std::env::remove_var("DB_POOL_SIZE");
+        std::env::remove_var("DB_CONNECTION_TIMEOUT_MS");
     }
 
     #[test]
     fn test_database_config_from_env() {
+        std::env::remove_var("DB_POOL_SIZE");
+        std::env::remove_var("DB_CONNECTION_TIMEOUT_MS");
+
         let original_pool = std::env::var("DB_POOL_SIZE").ok();
         let original_timeout = std::env::var("DB_CONNECTION_TIMEOUT_MS").ok();
+        assert!(original_pool.is_none());
+        assert!(original_timeout.is_none());
 
         std::env::set_var("DB_POOL_SIZE", "20");
         std::env::set_var("DB_CONNECTION_TIMEOUT_MS", "60000");
@@ -299,14 +317,8 @@ mod tests {
         assert_eq!(config.pool_size, 20);
         assert_eq!(config.connection_timeout_ms, 60000);
 
-        match original_pool {
-            Some(v) => std::env::set_var("DB_POOL_SIZE", v),
-            None => std::env::remove_var("DB_POOL_SIZE"),
-        }
-        match original_timeout {
-            Some(v) => std::env::set_var("DB_CONNECTION_TIMEOUT_MS", v),
-            None => std::env::remove_var("DB_CONNECTION_TIMEOUT_MS"),
-        }
+        std::env::remove_var("DB_POOL_SIZE");
+        std::env::remove_var("DB_CONNECTION_TIMEOUT_MS");
     }
 
     #[test]

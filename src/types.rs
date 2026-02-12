@@ -90,3 +90,120 @@ pub struct RouterState {
     pub last_timestamp: String,
     pub last_agent_timestamp: HashMap<String, String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_registered_group() {
+        let group = RegisteredGroup {
+            name: "Test Group".to_string(),
+            folder: "test_group".to_string(),
+            trigger: "@Andy".to_string(),
+            added_at: "2025-01-01T00:00:00Z".to_string(),
+        };
+        assert_eq!(group.name, "Test Group");
+        assert_eq!(group.folder, "test_group");
+    }
+
+    #[test]
+    fn test_session() {
+        let mut session = Session::new();
+        session.0.insert("key1".to_string(), "value1".to_string());
+        assert_eq!(session.len(), 1);
+    }
+
+    #[test]
+    fn test_scheduled_task() {
+        let task = ScheduledTask {
+            id: "task_1".to_string(),
+            group_folder: "group_1".to_string(),
+            chat_jid: "chat_1".to_string(),
+            prompt: "test prompt".to_string(),
+            schedule_type: "cron".to_string(),
+            schedule_value: "0 0 9 * * *".to_string(),
+            context_mode: "isolated".to_string(),
+            next_run: Some("2025-01-01T09:00:00Z".to_string()),
+            last_run: None,
+            last_result: None,
+            status: "active".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        };
+        assert_eq!(task.schedule_type, "cron");
+        assert_eq!(task.status, "active");
+    }
+
+    #[test]
+    fn test_container_input() {
+        let input = ContainerInput {
+            prompt: "test".to_string(),
+            session_id: Some("sess_123".to_string()),
+            group_folder: "group_1".to_string(),
+            chat_jid: "chat_1".to_string(),
+            is_main: true,
+            is_scheduled_task: false,
+        };
+        assert!(input.session_id.is_some());
+        assert!(input.is_main);
+    }
+
+    #[test]
+    fn test_container_output() {
+        let output = ContainerOutput {
+            status: "success".to_string(),
+            result: Some("result".to_string()),
+            new_session_id: Some("new_sess".to_string()),
+            error: None,
+        };
+        assert_eq!(output.status, "success");
+        assert!(output.result.is_some());
+        assert!(output.error.is_none());
+    }
+
+    #[test]
+    fn test_router_state() {
+        let mut state = RouterState::default();
+        state.last_timestamp = "2025-01-01T00:00:00Z".to_string();
+        state
+            .last_agent_timestamp
+            .insert("chat_1".to_string(), "2025-01-01T00:00:00Z".to_string());
+        assert_eq!(state.last_agent_timestamp.len(), 1);
+    }
+
+    #[test]
+    fn test_new_message() {
+        let msg = NewMessage {
+            id: "msg_1".to_string(),
+            chat_jid: "chat_1".to_string(),
+            sender: "user_1".to_string(),
+            sender_name: "Test User".to_string(),
+            content: "Hello".to_string(),
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+        };
+        assert_eq!(msg.content, "Hello");
+    }
+
+    #[test]
+    fn test_task_run_log() {
+        let log = TaskRunLog {
+            task_id: "task_1".to_string(),
+            run_at: "2025-01-01T00:00:00Z".to_string(),
+            duration_ms: 1000,
+            status: "success".to_string(),
+            result: Some("ok".to_string()),
+            error: None,
+        };
+        assert_eq!(log.duration_ms, 1000);
+    }
+
+    #[test]
+    fn test_chat_info() {
+        let info = ChatInfo {
+            jid: "chat_1".to_string(),
+            name: "Test Chat".to_string(),
+            last_message_time: "2025-01-01T00:00:00Z".to_string(),
+        };
+        assert_eq!(info.name, "Test Chat");
+    }
+}

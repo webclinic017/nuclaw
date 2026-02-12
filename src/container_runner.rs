@@ -398,63 +398,60 @@ mod tests {
 
     #[test]
     fn test_container_timeout_default() {
+        std::env::remove_var("CONTAINER_TIMEOUT");
         let timeout = container_timeout();
         assert_eq!(timeout, Duration::from_millis(DEFAULT_TIMEOUT_MS));
+        std::env::remove_var("CONTAINER_TIMEOUT");
     }
 
     #[test]
     fn test_container_timeout_from_env() {
-        // Save original value
+        std::env::remove_var("CONTAINER_TIMEOUT");
+        
         let original = std::env::var("CONTAINER_TIMEOUT").ok();
+        assert!(original.is_none());
 
         std::env::set_var("CONTAINER_TIMEOUT", "60000");
         let timeout = container_timeout();
         assert_eq!(timeout, Duration::from_millis(60000));
 
-        // Restore original value
-        match original {
-            Some(val) => std::env::set_var("CONTAINER_TIMEOUT", val),
-            None => std::env::remove_var("CONTAINER_TIMEOUT"),
-        }
+        std::env::remove_var("CONTAINER_TIMEOUT");
     }
 
     #[test]
     fn test_container_timeout_invalid_env() {
-        // Save original value
+        std::env::remove_var("CONTAINER_TIMEOUT");
+        
         let original = std::env::var("CONTAINER_TIMEOUT").ok();
+        assert!(original.is_none());
 
         std::env::set_var("CONTAINER_TIMEOUT", "invalid");
         let timeout = container_timeout();
-        // Should fall back to default
         assert_eq!(timeout, Duration::from_millis(DEFAULT_TIMEOUT_MS));
 
-        // Restore original value
-        match original {
-            Some(val) => std::env::set_var("CONTAINER_TIMEOUT", val),
-            None => std::env::remove_var("CONTAINER_TIMEOUT"),
-        }
+        std::env::remove_var("CONTAINER_TIMEOUT");
     }
 
     #[test]
     fn test_max_output_size_default() {
+        std::env::remove_var("CONTAINER_MAX_OUTPUT_SIZE");
         let max_size = max_output_size();
         assert_eq!(max_size, DEFAULT_MAX_OUTPUT);
+        std::env::remove_var("CONTAINER_MAX_OUTPUT_SIZE");
     }
 
     #[test]
     fn test_max_output_size_from_env() {
-        // Save original value
+        std::env::remove_var("CONTAINER_MAX_OUTPUT_SIZE");
+        
         let original = std::env::var("CONTAINER_MAX_OUTPUT_SIZE").ok();
+        assert!(original.is_none());
 
         std::env::set_var("CONTAINER_MAX_OUTPUT_SIZE", "5242880");
         let max_size = max_output_size();
         assert_eq!(max_size, 5 * 1024 * 1024);
 
-        // Restore original value
-        match original {
-            Some(val) => std::env::set_var("CONTAINER_MAX_OUTPUT_SIZE", val),
-            None => std::env::remove_var("CONTAINER_MAX_OUTPUT_SIZE"),
-        }
+        std::env::remove_var("CONTAINER_MAX_OUTPUT_SIZE");
     }
 
     #[test]

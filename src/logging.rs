@@ -204,26 +204,25 @@ mod tests {
 
     #[test]
     fn test_logging_config_defaults() {
+        std::env::remove_var("NUCLAW_LOG_JSON");
         let config = LoggingConfig::default();
-        // Should default to Info or whatever RUST_LOG is set to
         assert!(!config.json_format);
         assert!(config.include_timestamp);
+        std::env::remove_var("NUCLAW_LOG_JSON");
     }
 
     #[test]
     fn test_logging_config_from_env() {
-        // Save original values
+        std::env::remove_var("NUCLAW_LOG_JSON");
+
         let original_json = std::env::var("NUCLAW_LOG_JSON").ok();
+        assert!(original_json.is_none());
 
         std::env::set_var("NUCLAW_LOG_JSON", "true");
         let config = LoggingConfig::default();
         assert!(config.json_format);
 
-        // Restore
-        match original_json {
-            Some(v) => std::env::set_var("NUCLAW_LOG_JSON", v),
-            None => std::env::remove_var("NUCLAW_LOG_JSON"),
-        }
+        std::env::remove_var("NUCLAW_LOG_JSON");
     }
 
     #[test]

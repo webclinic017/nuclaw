@@ -47,3 +47,111 @@ pub mod json {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::json::{load_json, save_json};
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::tempdir;
+
+    #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone)]
+    struct TestData {
+        name: String,
+        value: i32,
+    }
+
+    fn test_dir() -> PathBuf {
+        tempdir().unwrap().into_path()
+    }
+
+    fn cleanup(path: &PathBuf) {
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_save_json() {
+        let dir = test_dir();
+        let path = dir.join("test.json");
+
+        let data = TestData {
+            name: "test".to_string(),
+            value: 42,
+        };
+
+        let result = save_json(&path, &data);
+        assert!(result.is_ok());
+        assert!(path.exists());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_load_json_existing() {
+        let dir = test_dir();
+        let path = dir.join("test.json");
+
+        let data = TestData {
+            name: "test".to_string(),
+            value: 42,
+        };
+        save_json(&path, &data).unwrap();
+
+        let loaded: TestData = load_json(&path, TestData::default());
+        assert_eq!(loaded.name, "test");
+        assert_eq!(loaded.value, 42);
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_load_json_nonexistent() {
+        let dir = test_dir();
+        let path = dir.join("nonexistent.json");
+
+        let default = TestData {
+            name: "default".to_string(),
+            value: 0,
+        };
+
+        let loaded: TestData = load_json(&path, default.clone());
+        assert_eq!(loaded.name, "default");
+        assert_eq!(loaded.value, 0);
+    }
+
+    #[test]
+    fn test_load_json_invalid() {
+        let dir = test_dir();
+        let path = dir.join("invalid.json");
+
+        fs::write(&path, "not valid json").unwrap();
+
+        let default = TestData {
+            name: "default".to_string(),
+            value: 0,
+        };
+
+        let loaded: TestData = load_json(&path, default.clone());
+        assert_eq!(loaded.name, "default");
+        assert_eq!(loaded.value, 0);
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_save_json_creates_parent() {
+        let dir = test_dir();
+        let path = dir.join("subdir").join("nested.json");
+
+        let data = TestData {
+            name: "nested".to_string(),
+            value: 100,
+        };
+
+        let result = save_json(&path, &data);
+        assert!(result.is_ok());
+        assert!(path.exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+}

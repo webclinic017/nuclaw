@@ -382,32 +382,7 @@ impl TelegramClient {
 
     /// Chunk text into smaller pieces
     fn chunk_text(&self, text: &str) -> Vec<String> {
-        if text.len() <= self.text_chunk_limit {
-            return vec![text.to_string()];
-        }
-
-        let mut chunks = Vec::new();
-        let mut current = String::new();
-
-        for paragraph in text.split("\n\n") {
-            if current.len() + paragraph.len() + 2 > self.text_chunk_limit {
-                if !current.is_empty() {
-                    chunks.push(current);
-                }
-                current = paragraph.to_string();
-            } else {
-                if !current.is_empty() {
-                    current.push_str("\n\n");
-                }
-                current.push_str(paragraph);
-            }
-        }
-
-        if !current.is_empty() {
-            chunks.push(current);
-        }
-
-        chunks
+        chunk_text_pure(text, self.text_chunk_limit)
     }
 
     /// Check DM policy
@@ -449,11 +424,9 @@ impl TelegramClient {
 
     /// Extract chat ID from jid
     fn extract_chat_id(&self, jid: &str) -> Result<String> {
-        jid.strip_prefix("telegram:group:")
-            .map(|s| s.to_string())
-            .ok_or_else(|| NuClawError::Telegram {
-                message: format!("Invalid telegram jid format: {}", jid),
-            })
+        extract_chat_id_pure(jid).ok_or_else(|| NuClawError::Telegram {
+            message: format!("Invalid telegram jid format: {}", jid),
+        })
     }
 
     /// Check if message is duplicate
@@ -568,7 +541,82 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len - 3])
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
+}
+
+/// Chunk text into smaller pieces (pure function)
+pub fn chunk_text_pure(text: &str, chunk_limit: usize) -> Vec<String> {
+    if text.len() <= chunk_limit {
+        return vec![text.to_string()];
+    }
+
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+
+    for paragraph in text.split("\n\n") {
+        if current.len() + paragraph.len() + 2 > chunk_limit {
+            if !current.is_empty() {
+                chunks.push(current);
+            }
+            current = paragraph.to_string();
+        } else {
+            if !current.is_empty() {
+                current.push_str("\n\n");
+            }
+            current.push_str(paragraph);
+        }
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    chunks
+}
+
+/// Extract chat ID from jid (pure function)
+pub fn extract_chat_id_pure(jid: &str) -> Option<String> {
+    jid.strip_prefix("telegram:group:").map(|s| s.to_string())
+}
+
+/// Check if message is duplicate (pure function)
+pub fn is_duplicate_message_pure(
+    msg: &NewMessage,
+    last_timestamp: &str,
+    last_agent_timestamps: &std::collections::HashMap<String, String>,
+) -> bool {
+    if last_timestamp == msg.timestamp {
+        return true;
+    }
+
+    if let Some(agent_ts) = last_agent_timestamps.get(&msg.chat_jid) {
+        if agent_ts == &msg.timestamp {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Check if group is allowed (pure function)
+pub fn is_allowed_group_pure(
+    chat_jid: &str,
+    policy: GroupPolicy,
+    allowed_groups: &[String],
+) -> bool {
+    match policy {
+        GroupPolicy::Disabled => false,
+        GroupPolicy::Open => true,
+        GroupPolicy::Allowlist => {
+            if let Some(chat_id) = chat_jid.strip_prefix("telegram:group:") {
+                allowed_groups
+                    .iter()
+                    .any(|g| g == chat_id || g == &format!("-{}", chat_id))
+            } else {
+                false
+            }
+        }
     }
 }
 
@@ -707,5 +755,135 @@ mod tests {
             "Expected multiple chunks but got {:?}",
             chunks
         );
+    }
+
+    #[test]
+    fn test_chunk_text_pure_short() {
+        let chunks = chunk_text_pure("short text", 4000);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "short text");
+    }
+
+    #[test]
+    fn test_chunk_text_pure_exact_limit() {
+        let text = "a".repeat(4000);
+        let chunks = chunk_text_pure(&text, 4000);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].len(), 4000);
+    }
+
+    #[test]
+    fn test_chunk_text_pure_over_limit() {
+        let text = "a".repeat(4001);
+        let chunks = chunk_text_pure(&text, 4000);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], text);
+    }
+
+    #[test]
+    fn test_chunk_text_pure_empty() {
+        let chunks = chunk_text_pure("", 4000);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "");
+    }
+
+    #[test]
+    fn test_extract_chat_id_pure_valid() {
+        assert_eq!(
+            extract_chat_id_pure("telegram:group:123456"),
+            Some("123456".to_string())
+        );
+        assert_eq!(
+            extract_chat_id_pure("telegram:group:-100123"),
+            Some("-100123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_chat_id_pure_invalid() {
+        assert_eq!(extract_chat_id_pure("invalid:jid"), None);
+        assert_eq!(extract_chat_id_pure("whatsapp:group:123"), None);
+        assert_eq!(extract_chat_id_pure(""), None);
+    }
+
+    #[test]
+    fn test_is_duplicate_message_pure() {
+        let msg = NewMessage {
+            id: "1".to_string(),
+            chat_jid: "telegram:group:123".to_string(),
+            sender: "user1".to_string(),
+            sender_name: "User".to_string(),
+            content: "hello".to_string(),
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+        };
+
+        let mut agent_ts = std::collections::HashMap::new();
+        agent_ts.insert("telegram:group:123".to_string(), "2025-01-01T00:00:00Z".to_string());
+
+        assert!(is_duplicate_message_pure(&msg, "2025-01-01T00:00:00Z", &HashMap::new()));
+        assert!(is_duplicate_message_pure(&msg, "old", &agent_ts));
+        assert!(!is_duplicate_message_pure(&msg, "old", &HashMap::new()));
+    }
+
+    #[test]
+    fn test_is_allowed_group_pure() {
+        let allowed = vec!["123".to_string(), "-456".to_string()];
+
+        assert!(is_allowed_group_pure(
+            "telegram:group:123",
+            GroupPolicy::Open,
+            &[]
+        ));
+        assert!(!is_allowed_group_pure(
+            "telegram:group:123",
+            GroupPolicy::Disabled,
+            &[]
+        ));
+        assert!(is_allowed_group_pure("telegram:group:123", GroupPolicy::Allowlist, &allowed));
+        assert!(is_allowed_group_pure("telegram:group:456", GroupPolicy::Allowlist, &allowed));
+        assert!(!is_allowed_group_pure(
+            "telegram:group:789",
+            GroupPolicy::Allowlist,
+            &allowed
+        ));
+    }
+
+    #[test]
+    fn test_truncate_telegram() {
+        assert_eq!(truncate("hello", 10), "hello");
+        assert_eq!(truncate("hello world", 8), "hello...");
+        assert_eq!(truncate("test", 3), "...");
+        assert_eq!(truncate("", 5), "");
+    }
+
+    #[test]
+    fn test_telegram_structs_serialization() {
+        let user = TelegramUser {
+            id: 123,
+            is_bot: false,
+            first_name: "Test".to_string(),
+            last_name: Some("User".to_string()),
+            username: Some("testuser".to_string()),
+        };
+        let json = serde_json::to_string(&user).unwrap();
+        assert!(json.contains("Test"));
+
+        let chat = TelegramChat {
+            id: -100123,
+            chat_type: "supergroup".to_string(),
+            title: Some("Test Group".to_string()),
+        };
+        let json = serde_json::to_string(&chat).unwrap();
+        assert!(json.contains("supergroup"));
+
+        let msg = TelegramMessage {
+            message_id: 456,
+            from: Some(user),
+            chat,
+            date: 1234567890,
+            text: Some("hello".to_string()),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("hello"));
     }
 }

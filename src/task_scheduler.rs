@@ -481,6 +481,44 @@ pub fn get_next_run_time(schedule: &Schedule) -> DateTime<Utc> {
         .unwrap_or_else(chrono::Utc::now)
 }
 
+/// Check if a task is due for execution
+pub fn is_task_due(task: &ScheduledTask, now: &str) -> bool {
+    if task.status != "active" {
+        return false;
+    }
+    match &task.next_run {
+        Some(next_run) => next_run.as_str() <= now,
+        None => true,
+    }
+}
+
+/// Determine task status based on execution result
+pub fn determine_task_status(success: bool, is_once: bool) -> &'static str {
+    if !success {
+        "failed"
+    } else if is_once {
+        "completed"
+    } else {
+        "active"
+    }
+}
+
+/// Validate schedule type
+pub fn is_valid_schedule_type(schedule_type: &str) -> bool {
+    matches!(schedule_type, "cron" | "interval" | "once")
+}
+
+/// Format duration for logging
+pub fn format_duration(duration_ms: i64) -> String {
+    if duration_ms < 1000 {
+        format!("{}ms", duration_ms)
+    } else if duration_ms < 60000 {
+        format!("{}s", duration_ms / 1000)
+    } else {
+        format!("{}m", duration_ms / 60000)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -689,6 +727,123 @@ mod tests {
         let db = Database::new().unwrap();
         let scheduler = TaskScheduler::new(db);
         let _cloned = scheduler.clone();
-        // Clone should work without panic
+    }
+
+    #[test]
+    fn test_is_task_due_active_no_next_run() {
+        let task = ScheduledTask {
+            id: "test".to_string(),
+            group_folder: "test".to_string(),
+            chat_jid: "test".to_string(),
+            prompt: "test".to_string(),
+            schedule_type: "interval".to_string(),
+            schedule_value: "3600000".to_string(),
+            next_run: None,
+            last_run: None,
+            last_result: None,
+            status: "active".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            context_mode: "isolated".to_string(),
+        };
+        let now = chrono::Utc::now().to_rfc3339();
+        assert!(is_task_due(&task, &now));
+    }
+
+    #[test]
+    fn test_is_task_due_active_with_past_next_run() {
+        let now = chrono::Utc::now();
+        let past = (now - chrono::Duration::hours(1)).to_rfc3339();
+        let task = ScheduledTask {
+            id: "test".to_string(),
+            group_folder: "test".to_string(),
+            chat_jid: "test".to_string(),
+            prompt: "test".to_string(),
+            schedule_type: "interval".to_string(),
+            schedule_value: "3600000".to_string(),
+            next_run: Some(past),
+            last_run: None,
+            last_result: None,
+            status: "active".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            context_mode: "isolated".to_string(),
+        };
+        let now_str = now.to_rfc3339();
+        assert!(is_task_due(&task, &now_str));
+    }
+
+    #[test]
+    fn test_is_task_due_active_with_future_nextRun() {
+        let now = chrono::Utc::now();
+        let future = (now + chrono::Duration::hours(1)).to_rfc3339();
+        let task = ScheduledTask {
+            id: "test".to_string(),
+            group_folder: "test".to_string(),
+            chat_jid: "test".to_string(),
+            prompt: "test".to_string(),
+            schedule_type: "interval".to_string(),
+            schedule_value: "3600000".to_string(),
+            next_run: Some(future),
+            last_run: None,
+            last_result: None,
+            status: "active".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            context_mode: "isolated".to_string(),
+        };
+        let now_str = now.to_rfc3339();
+        assert!(!is_task_due(&task, &now_str));
+    }
+
+    #[test]
+    fn test_is_task_due_inactive() {
+        let now = chrono::Utc::now().to_rfc3339();
+        let task = ScheduledTask {
+            id: "test".to_string(),
+            group_folder: "test".to_string(),
+            chat_jid: "test".to_string(),
+            prompt: "test".to_string(),
+            schedule_type: "interval".to_string(),
+            schedule_value: "3600000".to_string(),
+            next_run: None,
+            last_run: None,
+            last_result: None,
+            status: "paused".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            context_mode: "isolated".to_string(),
+        };
+        assert!(!is_task_due(&task, &now));
+    }
+
+    #[test]
+    fn test_determine_task_status_success_once() {
+        assert_eq!(determine_task_status(true, true), "completed");
+    }
+
+    #[test]
+    fn test_determine_task_status_success_recurring() {
+        assert_eq!(determine_task_status(true, false), "active");
+    }
+
+    #[test]
+    fn test_determine_task_status_failed() {
+        assert_eq!(determine_task_status(false, true), "failed");
+        assert_eq!(determine_task_status(false, false), "failed");
+    }
+
+    #[test]
+    fn test_is_valid_schedule_type() {
+        assert!(is_valid_schedule_type("cron"));
+        assert!(is_valid_schedule_type("interval"));
+        assert!(is_valid_schedule_type("once"));
+        assert!(!is_valid_schedule_type("invalid"));
+        assert!(!is_valid_schedule_type(""));
+    }
+
+    #[test]
+    fn test_format_duration() {
+        assert_eq!(format_duration(500), "500ms");
+        assert_eq!(format_duration(1000), "1s");
+        assert_eq!(format_duration(30000), "30s");
+        assert_eq!(format_duration(60000), "1m");
+        assert_eq!(format_duration(120000), "2m");
     }
 }

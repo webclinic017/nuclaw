@@ -316,15 +316,7 @@ impl WhatsAppClient {
 
     /// Extract trigger and content from message
     async fn extract_trigger(&self, content: &str) -> Option<(String, String)> {
-        let trigger_pattern = format!("@{}", self.assistant_name);
-
-        if let Some(idx) = content.find(&trigger_pattern) {
-            let after = &content[idx + trigger_pattern.len()..];
-            let c = after.trim().to_string();
-            return Some((trigger_pattern, c));
-        }
-
-        None
+        extract_trigger_pure(content, &self.assistant_name)
     }
 }
 
@@ -367,8 +359,50 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len - 3])
+        format!("{}...", &s[..max_len.saturating_sub(3)])
     }
+}
+
+/// Extract trigger and content from message (pure function)
+pub fn extract_trigger_pure(content: &str, assistant_name: &str) -> Option<(String, String)> {
+    let trigger_pattern = format!("@{}", assistant_name);
+
+    if let Some(idx) = content.find(&trigger_pattern) {
+        let after = &content[idx + trigger_pattern.len()..];
+        let c = after.trim().to_string();
+        return Some((trigger_pattern, c));
+    }
+
+    None
+}
+
+/// Check if message is duplicate (pure function)
+pub fn is_duplicate_message_pure(
+    msg: &NewMessage,
+    last_timestamp: &str,
+    last_agent_timestamps: &std::collections::HashMap<String, String>,
+) -> bool {
+    if last_timestamp == msg.timestamp {
+        return true;
+    }
+
+    if let Some(agent_ts) = last_agent_timestamps.get(&msg.chat_jid) {
+        if agent_ts == &msg.timestamp {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Check if message is from a private chat
+pub fn is_private_chat(jid: &str) -> bool {
+    jid.ends_with("@s.whatsapp.net")
+}
+
+/// Get group name from JID
+pub fn get_group_name_from_jid(jid: &str) -> Option<String> {
+    jid.split('@').next().map(|s| s.to_string())
 }
 
 #[cfg(test)]
@@ -422,5 +456,85 @@ mod tests {
             .block_on(client.extract_trigger("hello world"));
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_trigger_pure_basic() {
+        let result = extract_trigger_pure("@Andy hello world", "Andy");
+        assert!(result.is_some());
+        let (trigger, content) = result.unwrap();
+        assert_eq!(trigger, "@Andy");
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_extract_trigger_pure_no_trigger() {
+        assert!(extract_trigger_pure("hello world", "Andy").is_none());
+        assert!(extract_trigger_pure("", "Andy").is_none());
+    }
+
+    #[test]
+    fn test_extract_trigger_pure_different_name() {
+        let result = extract_trigger_pure("@Bob hello", "Bob");
+        assert!(result.is_some());
+        let (_, content) = result.unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn test_extract_trigger_pure_with_extra_spaces() {
+        let result = extract_trigger_pure("@Andy   hello   world  ", "Andy");
+        assert!(result.is_some());
+        let (_, content) = result.unwrap();
+        assert_eq!(content, "hello   world");
+    }
+
+    #[test]
+    fn test_extract_trigger_pure_mid_message() {
+        let result = extract_trigger_pure("hey @Andy help me", "Andy");
+        assert!(result.is_some());
+        let (_, content) = result.unwrap();
+        assert_eq!(content, "help me");
+    }
+
+    #[test]
+    fn test_is_duplicate_message_pure_whatsapp() {
+        let msg = NewMessage {
+            id: "1".to_string(),
+            chat_jid: "123@s.whatsapp.net".to_string(),
+            sender: "user1".to_string(),
+            sender_name: "User".to_string(),
+            content: "hello".to_string(),
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+        };
+
+        let mut agent_ts = std::collections::HashMap::new();
+        agent_ts.insert("123@s.whatsapp.net".to_string(), "2025-01-01T00:00:00Z".to_string());
+
+        assert!(is_duplicate_message_pure(&msg, "2025-01-01T00:00:00Z", &HashMap::new()));
+        assert!(is_duplicate_message_pure(&msg, "old", &agent_ts));
+        assert!(!is_duplicate_message_pure(&msg, "old", &HashMap::new()));
+    }
+
+    #[test]
+    fn test_is_private_chat() {
+        assert!(is_private_chat("123@s.whatsapp.net"));
+        assert!(!is_private_chat("123@g.us"));
+        assert!(!is_private_chat("123-456@g.us"));
+    }
+
+    #[test]
+    fn test_get_group_name_from_jid() {
+        assert_eq!(get_group_name_from_jid("123@s.whatsapp.net"), Some("123".to_string()));
+        assert_eq!(get_group_name_from_jid("mygroup@g.us"), Some("mygroup".to_string()));
+        assert_eq!(get_group_name_from_jid(""), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_truncate_whatsapp_edge_cases() {
+        assert_eq!(truncate("", 5), "");
+        assert_eq!(truncate("hi", 2), "hi");
+        assert_eq!(truncate("hello", 3), "...");
+        assert_eq!(truncate("test", 3), "...");
     }
 }

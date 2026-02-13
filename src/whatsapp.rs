@@ -85,7 +85,7 @@ impl WhatsAppClient {
         let mcp_url = get_mcp_url()?;
 
         let response = reqwest::Client::new()
-            .post(&format!("{}/auth/qr", mcp_url))
+            .post(format!("{}/auth/qr", mcp_url))
             .timeout(Duration::from_secs(30))
             .send()
             .await
@@ -130,7 +130,7 @@ impl WhatsAppClient {
         let mcp_url = get_mcp_url()?;
 
         let response = reqwest::Client::new()
-            .get(&format!("{}/messages", mcp_url))
+            .get(format!("{}/messages", mcp_url))
             .timeout(Duration::from_secs(30))
             .send()
             .await
@@ -229,7 +229,7 @@ impl WhatsAppClient {
         });
 
         let response = reqwest::Client::new()
-            .post(&format!("{}/messages/send", mcp_url))
+            .post(format!("{}/messages/send", mcp_url))
             .json(&payload)
             .timeout(Duration::from_secs(30))
             .send()

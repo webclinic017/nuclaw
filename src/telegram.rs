@@ -121,10 +121,10 @@ impl TelegramClient {
             api_url,
             webhook_path: std::env::var("TELEGRAM_WEBHOOK_PATH")
                 .unwrap_or_else(|_| "telegram-webhook".to_string()),
-            dm_policy: DMPolicy::from_str(
+            dm_policy: DMPolicy::parse(
                 &std::env::var("TELEGRAM_DM_POLICY").unwrap_or_else(|_| "pairing".to_string()),
             ),
-            group_policy: GroupPolicy::from_str(
+            group_policy: GroupPolicy::parse(
                 &std::env::var("TELEGRAM_GROUP_POLICY").unwrap_or_else(|_| "allowlist".to_string()),
             ),
             text_chunk_limit: std::env::var("TELEGRAM_TEXT_CHUNK_LIMIT")
@@ -623,7 +623,7 @@ pub fn is_allowed_group_pure(
 // Trait implementations for enums
 
 impl DMPolicy {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "pairing" => DMPolicy::Pairing,
             "allowlist" => DMPolicy::Allowlist,
@@ -635,7 +635,7 @@ impl DMPolicy {
 }
 
 impl GroupPolicy {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "open" => GroupPolicy::Open,
             "allowlist" => GroupPolicy::Allowlist,
@@ -697,19 +697,19 @@ mod tests {
 
     #[test]
     fn test_dm_policy_from_str() {
-        assert_eq!(DMPolicy::from_str("pairing"), DMPolicy::Pairing);
-        assert_eq!(DMPolicy::from_str("allowlist"), DMPolicy::Allowlist);
-        assert_eq!(DMPolicy::from_str("open"), DMPolicy::Open);
-        assert_eq!(DMPolicy::from_str("disabled"), DMPolicy::Disabled);
-        assert_eq!(DMPolicy::from_str("unknown"), DMPolicy::Pairing);
+        assert_eq!(DMPolicy::parse("pairing"), DMPolicy::Pairing);
+        assert_eq!(DMPolicy::parse("allowlist"), DMPolicy::Allowlist);
+        assert_eq!(DMPolicy::parse("open"), DMPolicy::Open);
+        assert_eq!(DMPolicy::parse("disabled"), DMPolicy::Disabled);
+        assert_eq!(DMPolicy::parse("unknown"), DMPolicy::Pairing);
     }
 
     #[test]
     fn test_group_policy_from_str() {
-        assert_eq!(GroupPolicy::from_str("open"), GroupPolicy::Open);
-        assert_eq!(GroupPolicy::from_str("allowlist"), GroupPolicy::Allowlist);
-        assert_eq!(GroupPolicy::from_str("disabled"), GroupPolicy::Disabled);
-        assert_eq!(GroupPolicy::from_str("unknown"), GroupPolicy::Allowlist);
+        assert_eq!(GroupPolicy::parse("open"), GroupPolicy::Open);
+        assert_eq!(GroupPolicy::parse("allowlist"), GroupPolicy::Allowlist);
+        assert_eq!(GroupPolicy::parse("disabled"), GroupPolicy::Disabled);
+        assert_eq!(GroupPolicy::parse("unknown"), GroupPolicy::Allowlist);
     }
 
     #[test]

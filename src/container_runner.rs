@@ -10,7 +10,7 @@
 //! - Configurable timeout
 //! - Output parsing with sentinel markers
 
-use crate::config::{assistant_name, data_dir, groups_dir, logs_dir};
+use crate::config::{anthropic_api_key, anthropic_base_url, assistant_name, data_dir, groups_dir, logs_dir};
 use crate::error::{NuClawError, Result};
 use crate::types::{ContainerInput, ContainerOutput};
 use std::fs;
@@ -166,10 +166,17 @@ async fn build_container_command(
             .arg("-v")
             .arg(format!("{}:/workspace/group", group_dir.display()))
             .arg("-e")
-            .arg("CLAUDE_CODE_OAUTH_TOKEN")
-            .arg("-e")
-            .arg("ANTHROPIC_API_KEY")
-            .arg("--entrypoint")
+            .arg("CLAUDE_CODE_OAUTH_TOKEN");
+        
+        if anthropic_api_key().is_some() {
+            cmd.arg("-e").arg("ANTHROPIC_API_KEY");
+        }
+        
+        if anthropic_base_url().is_some() {
+            cmd.arg("-e").arg("ANTHROPIC_BASE_URL");
+        }
+        
+        cmd.arg("--entrypoint")
             .arg("/bin/sh")
             .arg(image)
             .arg("-c")

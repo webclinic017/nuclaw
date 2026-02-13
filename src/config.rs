@@ -34,6 +34,14 @@ pub fn assistant_name() -> String {
     env::var("ASSISTANT_NAME").unwrap_or_else(|_| "Andy".to_string())
 }
 
+pub fn anthropic_api_key() -> Option<String> {
+    env::var("ANTHROPIC_API_KEY").ok()
+}
+
+pub fn anthropic_base_url() -> Option<String> {
+    env::var("ANTHROPIC_BASE_URL").ok()
+}
+
 pub fn timezone() -> String {
     env::var("TZ").unwrap_or_else(|_| "UTC".to_string())
 }
@@ -51,4 +59,47 @@ pub fn ensure_directories() -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_anthropic_api_key_from_env() {
+        std::env::remove_var("ANTHROPIC_API_KEY");
+        assert!(anthropic_api_key().is_none());
+
+        std::env::set_var("ANTHROPIC_API_KEY", "test-key-123");
+        assert_eq!(anthropic_api_key(), Some("test-key-123".to_string()));
+
+        std::env::remove_var("ANTHROPIC_API_KEY");
+    }
+
+    #[test]
+    fn test_anthropic_base_url_from_env() {
+        std::env::remove_var("ANTHROPIC_BASE_URL");
+        assert!(anthropic_base_url().is_none());
+
+        std::env::set_var("ANTHROPIC_BASE_URL", "https://api.anthropic.com");
+        assert_eq!(
+            anthropic_base_url(),
+            Some("https://api.anthropic.com".to_string())
+        );
+
+        std::env::remove_var("ANTHROPIC_BASE_URL");
+    }
+
+    #[test]
+    fn test_anthropic_base_url_custom_endpoint() {
+        std::env::remove_var("ANTHROPIC_BASE_URL");
+
+        std::env::set_var("ANTHROPIC_BASE_URL", "https://custom.endpoint.com/v1");
+        assert_eq!(
+            anthropic_base_url(),
+            Some("https://custom.endpoint.com/v1".to_string())
+        );
+
+        std::env::remove_var("ANTHROPIC_BASE_URL");
+    }
 }
